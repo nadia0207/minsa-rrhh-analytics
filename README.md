@@ -47,11 +47,22 @@ minsa-rrhh-analytics/
 ## Progreso
 
 - [x] Estructura del proyecto y entorno con uv
-- [ ] ETL: consolidación de los 7 años y verificación de columnas
+- [x] ETL: consolidación de los 7 años (2019-2025) en un solo dataset de ~1.9 M de filas
+- [x] Comparación de columnas entre años y mapeo a un esquema común (`notebooks/01_comparacion_columnas.ipynb`)
+- [ ] Validación de calidad del consolidado (`notebooks/02_validacion_consolidado.ipynb`) — **en curso**
+  - [x] Normalización de `es_especialista` (SI/NO) y unificación de tipos
+  - [ ] Reglas de negocio (especialidad completa, residentes)
+  - [ ] Revisión de edad
 - [ ] Carga a PostgreSQL
 - [ ] Análisis exploratorio (EDA)
 - [ ] Dashboard en Power BI
 - [ ] Modelo de Machine Learning
+
+## Decisiones de calidad de datos
+
+- Las bases de cada año usan nombres y codificaciones distintas; se unificaron en un esquema común y se documentaron las columnas descartadas y el motivo.
+- `es_especialista` venía con codificaciones distintas según el año (`SI`/`NO`, `No`, `0`, `-`, vacío). Se normaliza a `SI`/`NO`: los valores vacíos, `0` y `-` se tratan como `NO`.
+- El ETL se detiene con un error si aparece un valor no reconocido, en lugar de clasificarlo en silencio.
 
 ## Autora
 
