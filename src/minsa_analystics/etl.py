@@ -8,6 +8,10 @@ finales_2025 -> True, 31 columnas).
 import pandas as pd
 from sqlalchemy import create_engine
 
+# Valores para el campo 'es_especialista'
+VALORES_SI = {'SI', 'SÍ', '1'}
+VALORES_NO = {'NO', '0', '-', ''}   # los nulos también cuentan como NO
+
 # =============================================================================
 # A. CONFIGURACIÓN ESTRUCTURAL
 # =============================================================================
@@ -337,6 +341,28 @@ def consolidar_anio(df, anio, mapeo_columnas, columnas_descartadas):
     df_proc['anio_registro'] = anio
     return df_proc
 
+def normalizar_tipos(df):
+    """Unifica tipos mixtos y normaliza es_especialista a 'SI' / 'NO'.
+    Detiene el proceso si aparece un valor no reconocido."""
+    es = (
+        df['es_especialista'].astype('string').str.strip().str.upper()
+        .str.replace(r'\.0$', '', regex=True)   # 1.0 -> 1
+    )
+
+    # Detener ante valores desconocidos (los nulos son válidos y cuentan como NO)
+    mask = es.notna() & ~es.isin(VALORES_SI | VALORES_NO)
+    if mask.any():
+        detalle = (df.loc[mask, 'anio_registro'].astype(str) + ': ' + es[mask]).value_counts()
+        raise ValueError(f"es_especialista: valores no reconocidos (año: valor)\n{detalle}")
+
+    df['es_especialista'] = es.isin(VALORES_SI).map({True: 'SI', False: 'NO'}).astype('string')
+
+    for col in ['id_especialidad', 'especialidad', 'condicion_especialidad']:
+        df[col] = (
+            df[col].astype('string').str.strip()
+            .str.replace(r'\.0$', '', regex=True)
+        )
+    return df
 
 # =============================================================================
 # C. PIPELINE PRINCIPAL
@@ -364,6 +390,8 @@ def consolidar_datos(ruta_datos="data/raw"):
         print(f"{anio}: {len(df_final):,} filas, {len(df_final.columns)} columnas")
 
     consolidado = pd.concat(dataframes, ignore_index=True)
+    consolidado = normalizar_tipos(consolidado)
+    
     print(f"\nConsolidado final: {len(consolidado):,} filas, {len(consolidado.columns)} columnas")
     return consolidado
 
