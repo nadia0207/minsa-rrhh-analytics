@@ -8,9 +8,18 @@ finales_2025 -> True, 31 columnas).
 import pandas as pd
 from sqlalchemy import create_engine
 
+# =============================================================================
 # Valores para el campo 'es_especialista'
 VALORES_SI = {'SI', 'SÍ', '1'}
 VALORES_NO = {'NO', '0', '-', ''}   # los nulos también cuentan como NO
+
+# =============================================================================
+# Valores para quitar tildes
+TILDES = str.maketrans('ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu')   # no incluye la Ñ
+COLUMNAS_SIN_TILDES = [
+    'provincia', 'descripcionestablecimiento', 'especialidad',
+    'regimen_laboral', 'condicion_laboral',
+]
 
 # =============================================================================
 # A. CONFIGURACIÓN ESTRUCTURAL
@@ -364,6 +373,39 @@ def normalizar_tipos(df):
         )
     return df
 
+def limpiar_texto(df):
+    """Recorta espacios en todas las columnas de texto y quita tildes de vocales
+    solo en las columnas donde generaban valores duplicados (conserva la Ñ)."""
+    for col in df.columns:
+        if pd.api.types.is_string_dtype(df[col]):
+            df[col] = df[col].str.strip()
+    for col in COLUMNAS_SIN_TILDES:
+        df[col] = df[col].str.translate(TILDES)
+    return df
+
+def unificar_unidades_ejecutoras(df):
+    """Cada código de unidad ejecutora usa el nombre del año más reciente en que aparece."""
+    cod = df['uedescripue'].str.extract(r'^(\d+)')[0]
+    tmp = pd.DataFrame({'cod': cod, 'nombre': df['uedescripue'], 'anio': df['anio_registro']})
+    ultimo = tmp.sort_values('anio').drop_duplicates('cod', keep='last').set_index('cod')['nombre']
+    df['uedescripue'] = cod.map(ultimo).fillna(df['uedescripue'])
+    return df
+
+def aplicar_reglas_negocio(df):
+    """Marca registros que violan las reglas de negocio de es_especialista.
+    No modifica los datos originales: solo agrega columnas flag_*."""
+    campos_incompletos = (
+        df['id_especialidad'].isna()
+        | df['especialidad'].isna()
+        | df['condicion_especialidad'].isna()
+    )
+    es_si = df['es_especialista'] == 'SI'
+    es_residente = df['condicion_laboral'].astype('string').str.strip().str.lower() == 'residente'
+
+    df['flag_especialista_incompleto'] = es_si & campos_incompletos
+    df['flag_residente_especialista'] = es_si & es_residente
+    return df
+
 # =============================================================================
 # C. PIPELINE PRINCIPAL
 # =============================================================================
@@ -391,6 +433,11 @@ def consolidar_datos(ruta_datos="data/raw"):
 
     consolidado = pd.concat(dataframes, ignore_index=True)
     consolidado = normalizar_tipos(consolidado)
+    consolidado = limpiar_texto(consolidado)
+    consolidado = unificar_unidades_ejecutoras(consolidado)   
+    consolidado = aplicar_reglas_negocio(consolidado)       
+    # consolidado = eliminar_columnas_innecesarias(consolidado)  # al final de la revisión
+
     
     print(f"\nConsolidado final: {len(consolidado):,} filas, {len(consolidado.columns)} columnas")
     return consolidado
