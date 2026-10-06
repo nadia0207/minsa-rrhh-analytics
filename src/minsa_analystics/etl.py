@@ -22,6 +22,11 @@ COLUMNAS_SIN_TILDES = [
 ]
 
 # =============================================================================
+# Correcciones de nombre de distrito detectadas en la revisión: (ubigeo, nombre erróneo) -> nombre correcto
+CORRECCIONES_DISTRITO = {
+    ('130112', 'VIR'): 'ALTO TRUJILLO',   # 2024: 7 filas de establecimientos de Alto Trujillo (renaes 00005220 y 00012229)
+}
+# =============================================================================
 # A. CONFIGURACIÓN ESTRUCTURAL
 # =============================================================================
 
@@ -374,13 +379,20 @@ def normalizar_tipos(df):
     return df
 
 def limpiar_texto(df):
-    """Recorta espacios en todas las columnas de texto y quita tildes de vocales
-    solo en las columnas donde generaban valores duplicados (conserva la Ñ)."""
+    """Recorta espacios y colapsa espacios dobles en todas las columnas de texto;
+    quita tildes de vocales solo en las columnas donde generaban duplicados (conserva la Ñ)."""
     for col in df.columns:
         if pd.api.types.is_string_dtype(df[col]):
-            df[col] = df[col].str.strip()
+            df[col] = df[col].str.strip().str.replace(r'\s+', ' ', regex=True)
     for col in COLUMNAS_SIN_TILDES:
         df[col] = df[col].str.translate(TILDES)
+    return df
+
+def corregir_distritos(df):
+    """Corrige nombres de distrito erróneos identificados en la validación."""
+    for (ubigeo, malo), bueno in CORRECCIONES_DISTRITO.items():
+        mask = (df['ubigeo'] == ubigeo) & (df['distrito'] == malo)
+        df.loc[mask, 'distrito'] = bueno
     return df
 
 def unificar_unidades_ejecutoras(df):
@@ -434,6 +446,7 @@ def consolidar_datos(ruta_datos="data/raw"):
     consolidado = pd.concat(dataframes, ignore_index=True)
     consolidado = normalizar_tipos(consolidado)
     consolidado = limpiar_texto(consolidado)
+    consolidado = corregir_distritos(consolidado)
     consolidado = unificar_unidades_ejecutoras(consolidado)   
     consolidado = aplicar_reglas_negocio(consolidado)       
     # consolidado = eliminar_columnas_innecesarias(consolidado)  # al final de la revisión
