@@ -26,6 +26,21 @@ COLUMNAS_SIN_TILDES = [
 CORRECCIONES_DISTRITO = {
     ('130112', 'VIR'): 'ALTO TRUJILLO',   # 2024: 7 filas de establecimientos de Alto Trujillo (renaes 00005220 y 00012229)
 }
+
+# =============================================================================
+# Convertimos datos de algunas columnas a Mayusculas
+COLUMNAS_MAYUSCULA = ['diresa', 'red', 'microrred']
+SIN_RED = {
+    'red': 'NO PERTENECE A NINGUNA RED',
+    'microrred': 'NO PERTENECE A NINGUNA MICRORED',
+}
+
+# =============================================================================
+COLUMNAS_A_ELIMINAR = {
+    'pea': 'Constante = 1 (contador de tablas dinámicas)',
+    'clasificacion': 'Sin actualizar y no usada en reportes; mezcla tipo de establecimiento con unidades administrativas',
+}
+
 # =============================================================================
 # A. CONFIGURACIÓN ESTRUCTURAL
 # =============================================================================
@@ -388,6 +403,22 @@ def limpiar_texto(df):
         df[col] = df[col].str.translate(TILDES)
     return df
 
+def unificar_sin_red(df):
+    """Pasa diresa/red/microrred a mayúscula; en red y microrred, nulos, '-' y
+    cualquier variante de 'NO PERTENECE...' / '...A NINGUNA...' (incluido el
+    tipeo 'PERNTENE') pasan a la etiqueta única."""
+    for col in COLUMNAS_MAYUSCULA:
+        df[col] = df[col].str.upper()
+    for col, etiqueta in SIN_RED.items():
+        s = df[col]
+        sin_red = (
+            s.isna()
+            | s.isin(['', '-'])
+            | s.str.contains('NO PERTENECE|A NINGUNA', na=False)
+        )
+        df[col] = s.mask(sin_red, etiqueta)
+    return df
+
 def corregir_distritos(df):
     """Corrige nombres de distrito erróneos identificados en la validación."""
     for (ubigeo, malo), bueno in CORRECCIONES_DISTRITO.items():
@@ -418,6 +449,10 @@ def aplicar_reglas_negocio(df):
     df['flag_residente_especialista'] = es_si & es_residente
     return df
 
+def eliminar_columnas_innecesarias(df):
+    """Elimina las columnas descartadas durante la validación del consolidado."""
+    return df.drop(columns=list(COLUMNAS_A_ELIMINAR))
+
 # =============================================================================
 # C. PIPELINE PRINCIPAL
 # =============================================================================
@@ -446,10 +481,12 @@ def consolidar_datos(ruta_datos="data/raw"):
     consolidado = pd.concat(dataframes, ignore_index=True)
     consolidado = normalizar_tipos(consolidado)
     consolidado = limpiar_texto(consolidado)
+    consolidado = unificar_sin_red(consolidado)
     consolidado = corregir_distritos(consolidado)
     consolidado = unificar_unidades_ejecutoras(consolidado)   
-    consolidado = aplicar_reglas_negocio(consolidado)       
-    # consolidado = eliminar_columnas_innecesarias(consolidado)  # al final de la revisión
+    consolidado = aplicar_reglas_negocio(consolidado)    
+    consolidado = eliminar_columnas_innecesarias(consolidado)  
+
 
     
     print(f"\nConsolidado final: {len(consolidado):,} filas, {len(consolidado.columns)} columnas")
