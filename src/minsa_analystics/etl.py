@@ -29,7 +29,7 @@ CORRECCIONES_DISTRITO = {
 
 # =============================================================================
 # Convertimos datos de algunas columnas a Mayusculas
-COLUMNAS_MAYUSCULA = ['diresa', 'red', 'microrred']
+COLUMNAS_MAYUSCULA = ['diresa', 'red', 'microrred', 'categoria']
 SIN_RED = {
     'red': 'NO PERTENECE A NINGUNA RED',
     'microrred': 'NO PERTENECE A NINGUNA MICRORED',
@@ -351,7 +351,6 @@ def obtener_columnas_finales(columnas_del_anio, anio, mapeo_columnas, columnas_d
     mantenidas = set(columnas_del_anio) - descartadas
     return sorted({mapeo.get(col, col) for col in mantenidas})
 
-
 def consolidar_anio(df, anio, mapeo_columnas, columnas_descartadas):
     """Aplica descartes, renombra columnas al estándar canónico y etiqueta el año."""
     df_proc = df.copy()
@@ -395,20 +394,21 @@ def normalizar_tipos(df):
 
 def limpiar_texto(df):
     """Recorta espacios y colapsa espacios dobles en todas las columnas de texto;
-    quita tildes de vocales solo en las columnas donde generaban duplicados (conserva la Ñ)."""
+        quita tildes de vocales solo en las columnas donde generaban duplicados (conserva la Ñ).
+        Convierte a Mayuscula todos los datos de algunas columnas."""
     for col in df.columns:
         if pd.api.types.is_string_dtype(df[col]):
             df[col] = df[col].str.strip().str.replace(r'\s+', ' ', regex=True)
     for col in COLUMNAS_SIN_TILDES:
         df[col] = df[col].str.translate(TILDES)
+    for col in COLUMNAS_MAYUSCULA:
+        df[col] = df[col].str.upper()
     return df
 
 def unificar_sin_red(df):
-    """Pasa diresa/red/microrred a mayúscula; en red y microrred, nulos, '-' y
-    cualquier variante de 'NO PERTENECE...' / '...A NINGUNA...' (incluido el
-    tipeo 'PERNTENE') pasan a la etiqueta única."""
-    for col in COLUMNAS_MAYUSCULA:
-        df[col] = df[col].str.upper()
+    """En red y microrred, los nulos, '-' y cualquier variante de 'NO PERTENECE...'
+    o '...A NINGUNA...' (incluido el tipeo 'PERNTENE') pasan a la etiqueta única.
+    Debe ejecutarse después de limpiar_texto, que deja estas columnas en mayúscula."""
     for col, etiqueta in SIN_RED.items():
         s = df[col]
         sin_red = (
@@ -432,6 +432,39 @@ def unificar_unidades_ejecutoras(df):
     tmp = pd.DataFrame({'cod': cod, 'nombre': df['uedescripue'], 'anio': df['anio_registro']})
     ultimo = tmp.sort_values('anio').drop_duplicates('cod', keep='last').set_index('cod')['nombre']
     df['uedescripue'] = cod.map(ultimo).fillna(df['uedescripue'])
+    return df
+
+def unificar_establecimientos(df):
+    """Cada renaes usa el nombre del año más reciente en que aparece. Y si tiene comillas quita el 
+    ultimo espacio antes de la comilla si es que hubiera. """
+    d = 'descripcionestablecimiento'
+    df[d] = (
+        df[d].str.replace('"', '', regex=False)
+        .str.replace(r'\s+', ' ', regex=True)
+        .str.strip()
+    )
+    ultimo = (
+        df[['renaes', d, 'anio_registro']]
+        .sort_values('anio_registro', kind='stable')
+        .drop_duplicates('renaes', keep='last')
+        .set_index('renaes')[d]
+    )
+    df[d] = df['renaes'].map(ultimo)
+    return df
+
+def agregar_categoria_actual(df):
+    """Conserva categoria (la de cada año) y agrega categoria_actual (la del año
+    más reciente por renaes) y flag_cambio_categoria (renaes con >1 categoría)."""
+    actual = (
+        df[['renaes', 'categoria', 'anio_registro']]
+        .sort_values('anio_registro', kind='stable')
+        .drop_duplicates('renaes', keep='last')
+        .set_index('renaes')['categoria']
+    )
+    df['categoria_actual'] = df['renaes'].map(actual)
+    df['flag_cambio_categoria'] = (
+        df.groupby('renaes')['categoria'].transform('nunique') > 1
+    )
     return df
 
 def aplicar_reglas_negocio(df):
@@ -483,7 +516,9 @@ def consolidar_datos(ruta_datos="data/raw"):
     consolidado = limpiar_texto(consolidado)
     consolidado = unificar_sin_red(consolidado)
     consolidado = corregir_distritos(consolidado)
-    consolidado = unificar_unidades_ejecutoras(consolidado)   
+    consolidado = unificar_unidades_ejecutoras(consolidado)
+    consolidado = unificar_establecimientos(consolidado)
+    consolidado = agregar_categoria_actual(consolidado)   
     consolidado = aplicar_reglas_negocio(consolidado)    
     consolidado = eliminar_columnas_innecesarias(consolidado)  
 
