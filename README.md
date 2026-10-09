@@ -36,7 +36,7 @@ minsa-rrhh-analytics/
 │   ├── raw/            # Excel originales (no versionados)
 │   └── processed/      # Datos limpios y consolidados
 ├── notebooks/          # Exploración y análisis
-├── src/minsa_analytics/
+├── src/minsa_analystics/
 │   ├── etl.py           # Carga y consolidación de los 7 años
 │   ├── db.py             # Conexión a PostgreSQL
 │   └── models.py         # Modelo de ML
