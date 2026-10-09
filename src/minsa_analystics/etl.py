@@ -28,6 +28,12 @@ CORRECCIONES_DISTRITO = {
 }
 
 # =============================================================================
+CORRECCIONES_QUINTIL = {
+    # (ubigeo, año): quintil correcto
+    ('130112', 2024): 3,   # 7 filas (renaes 00005220 y 00012229) traían 2; en 2025 es 3 y en El Porvenir era 3
+}
+
+# =============================================================================
 # Convertimos datos de algunas columnas a Mayusculas
 COLUMNAS_MAYUSCULA = ['diresa', 'red', 'microrred', 'categoria']
 SIN_RED = {
@@ -426,6 +432,14 @@ def corregir_distritos(df):
         df.loc[mask, 'distrito'] = bueno
     return df
 
+def corregir_quintil(df):
+    """El quintil es un atributo del distrito y no cambia entre años; corrige los
+    casos donde un ubigeo trae un valor distinto en un año puntual."""
+    for (ubigeo, anio), bueno in CORRECCIONES_QUINTIL.items():
+        mask = (df['ubigeo'] == ubigeo) & (df['anio_registro'] == anio)
+        df.loc[mask, 'quintil'] = bueno
+    return df
+
 def unificar_unidades_ejecutoras(df):
     """Cada código de unidad ejecutora usa el nombre del año más reciente en que aparece."""
     cod = df['uedescripue'].str.extract(r'^(\d+)')[0]
@@ -516,6 +530,7 @@ def consolidar_datos(ruta_datos="data/raw"):
     consolidado = limpiar_texto(consolidado)
     consolidado = unificar_sin_red(consolidado)
     consolidado = corregir_distritos(consolidado)
+    consolidado = corregir_quintil(consolidado)
     consolidado = unificar_unidades_ejecutoras(consolidado)
     consolidado = unificar_establecimientos(consolidado)
     consolidado = agregar_categoria_actual(consolidado)   
