@@ -48,6 +48,9 @@ COLUMNAS_A_ELIMINAR = {
 }
 
 # =============================================================================
+COLUMNAS_BOOLEANAS = ['distfrontera']   # se agregan zaf2014final y estrategicos al validarlas
+
+# =============================================================================
 # A. CONFIGURACIÓN ESTRUCTURAL
 # =============================================================================
 
@@ -496,6 +499,18 @@ def aplicar_reglas_negocio(df):
     df['flag_residente_especialista'] = es_si & es_residente
     return df
 
+def convertir_a_booleano(df):
+    """Convierte a booleano las columnas 0/1. Se detiene si hay nulos o valores
+    distintos de 0 y 1, en lugar de convertirlos en silencio."""
+    for col in COLUMNAS_BOOLEANAS:
+        if df[col].isna().any():
+            raise ValueError(f'{col}: tiene nulos; no se puede convertir a booleano')
+        inesperados = set(df[col].unique()) - {0, 1}
+        if inesperados:
+            raise ValueError(f'{col}: valores inesperados {inesperados}')
+        df[col] = df[col].astype(bool)
+    return df
+
 def eliminar_columnas_innecesarias(df):
     """Elimina las columnas descartadas durante la validación del consolidado."""
     return df.drop(columns=list(COLUMNAS_A_ELIMINAR))
@@ -534,7 +549,8 @@ def consolidar_datos(ruta_datos="data/raw"):
     consolidado = unificar_unidades_ejecutoras(consolidado)
     consolidado = unificar_establecimientos(consolidado)
     consolidado = agregar_categoria_actual(consolidado)   
-    consolidado = aplicar_reglas_negocio(consolidado)    
+    consolidado = aplicar_reglas_negocio(consolidado)  
+    consolidado = convertir_a_booleano(consolidado) 
     consolidado = eliminar_columnas_innecesarias(consolidado)  
 
 
