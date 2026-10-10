@@ -48,8 +48,7 @@ COLUMNAS_A_ELIMINAR = {
 }
 
 # =============================================================================
-COLUMNAS_BOOLEANAS = ['distfrontera', 'zaf2014final'] # pediente estratgico
-
+COLUMNAS_BOOLEANAS = ['distfrontera', 'zaf2014final', 'estrategicos']
 # =============================================================================
 # A. CONFIGURACIÓN ESTRUCTURAL
 # =============================================================================
