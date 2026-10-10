@@ -49,6 +49,13 @@ COLUMNAS_A_ELIMINAR = {
 
 # =============================================================================
 COLUMNAS_BOOLEANAS = ['distfrontera', 'zaf2014final', 'estrategicos']
+
+# =============================================================================
+VALORES_SIN_DATO = {
+    'sexo': 'Sin dato',   # 543 nulos de 2019 (médicos residentes sin sexo ni edad en la fuente)
+}
+
+
 # =============================================================================
 # A. CONFIGURACIÓN ESTRUCTURAL
 # =============================================================================
@@ -427,6 +434,12 @@ def unificar_sin_red(df):
         df[col] = s.mask(sin_red, etiqueta)
     return df
 
+def rellenar_sin_dato(df):
+    """Reemplaza los nulos de columnas categóricas por una etiqueta explícita."""
+    for col, etiqueta in VALORES_SIN_DATO.items():
+        df[col] = df[col].fillna(etiqueta)
+    return df
+
 def corregir_distritos(df):
     """Corrige nombres de distrito erróneos identificados en la validación."""
     for (ubigeo, malo), bueno in CORRECCIONES_DISTRITO.items():
@@ -543,6 +556,7 @@ def consolidar_datos(ruta_datos="data/raw"):
     consolidado = normalizar_tipos(consolidado)
     consolidado = limpiar_texto(consolidado)
     consolidado = unificar_sin_red(consolidado)
+    consolidado = rellenar_sin_dato(consolidado)
     consolidado = corregir_distritos(consolidado)
     consolidado = corregir_quintil(consolidado)
     consolidado = unificar_unidades_ejecutoras(consolidado)
