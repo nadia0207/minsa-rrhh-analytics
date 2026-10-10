@@ -48,7 +48,7 @@ COLUMNAS_A_ELIMINAR = {
 }
 
 # =============================================================================
-COLUMNAS_BOOLEANAS = ['distfrontera']   # se agregan zaf2014final y estrategicos al validarlas
+COLUMNAS_BOOLEANAS = ['distfrontera', 'zaf2014final'] 
 
 # =============================================================================
 # A. CONFIGURACIÓN ESTRUCTURAL
