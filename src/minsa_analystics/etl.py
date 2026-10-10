@@ -35,10 +35,17 @@ CORRECCIONES_QUINTIL = {
 
 # =============================================================================
 # Convertimos datos de algunas columnas a Mayusculas
-COLUMNAS_MAYUSCULA = ['diresa', 'red', 'microrred', 'categoria']
+COLUMNAS_MAYUSCULA = ['diresa', 'red', 'microrred', 'categoria', 'condicion_especialidad']
 SIN_RED = {
     'red': 'NO PERTENECE A NINGUNA RED',
     'microrred': 'NO PERTENECE A NINGUNA MICRORED',
+}
+
+# =============================================================================
+VALORES_A_NULO = {   # columna: valores que equivalen a "sin especialidad"
+    'id_especialidad': ['-', '0'],
+    'especialidad': ['-', '0'],
+    'condicion_especialidad': ['-', '0'],
 }
 
 # =============================================================================
@@ -496,6 +503,17 @@ def agregar_categoria_actual(df):
     )
     return df
 
+def limpiar_especialidad(df):
+    """Unifica 'sin especialidad' ('-', '0' y nulos) como nulo y las variantes de
+    'no especifica' de condicion_especialidad. Va después de limpiar_texto, que deja
+    esa columna en mayúscula."""
+    for col, valores in VALORES_A_NULO.items():
+        s = df[col]
+        df[col] = s.mask(s.isin(valores), pd.NA)
+    s = df['condicion_especialidad']
+    df['condicion_especialidad'] = s.mask(s.str.contains('ESPECIF', na=False), 'NO ESPECIFICADO')
+    return df
+
 def aplicar_reglas_negocio(df):
     """Marca registros que violan las reglas de negocio de es_especialista.
     No modifica los datos originales: solo agrega columnas flag_*."""
@@ -561,7 +579,8 @@ def consolidar_datos(ruta_datos="data/raw"):
     consolidado = corregir_quintil(consolidado)
     consolidado = unificar_unidades_ejecutoras(consolidado)
     consolidado = unificar_establecimientos(consolidado)
-    consolidado = agregar_categoria_actual(consolidado)   
+    consolidado = agregar_categoria_actual(consolidado)  
+    consolidado = limpiar_especialidad(consolidado) 
     consolidado = aplicar_reglas_negocio(consolidado)  
     consolidado = convertir_a_booleano(consolidado) 
     consolidado = eliminar_columnas_innecesarias(consolidado)  
