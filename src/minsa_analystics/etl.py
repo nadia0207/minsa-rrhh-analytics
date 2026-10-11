@@ -72,7 +72,7 @@ IDS_SIN_NOMBRE_ESPERADOS = 12
 
 # =============================================================================
 # Residentes y especialidad
-CONDICIONES_RESIDENTE = {'residente'}   # en minúscula
+CONDICIONES_RESIDENTE = {'residente', 'residente plaza cautiva'}   # en minúscula
 
 # nombre de especialidad -> id (solo especialidades que existen en una única profesión)
 CODIGOS_ESPECIALIDAD = {
@@ -638,15 +638,16 @@ def rellenar_sin_dato_residentes(df):
     return df
 
 def aplicar_reglas_negocio(df):
-    """Marca registros que violan las reglas de negocio de es_especialista.
-    No modifica los datos originales: solo agrega columnas flag_*."""
+    """Marca con flags los registros que violan las reglas de negocio de es_especialista,
+    tal como vienen de la fuente (antes de corregir_residentes e igualar_condicion_especialidad,
+    que los corrigen). No modifica datos: solo agrega columnas flag_*."""
     campos_incompletos = (
         df['id_especialidad'].isna()
         | df['especialidad'].isna()
         | df['condicion_especialidad'].isna()
     )
     es_si = df['es_especialista'] == 'SI'
-    es_residente = df['condicion_laboral'].astype('string').str.strip().str.lower() == 'residente'
+    es_residente = _es_residente(df)        # antes: df['condicion_laboral']...str.lower() == 'residente'
 
     df['flag_especialista_incompleto'] = es_si & campos_incompletos
     df['flag_residente_especialista'] = es_si & es_residente
