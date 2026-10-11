@@ -14,8 +14,10 @@ VALORES_SI = {'SI', 'SÍ', '1'}
 VALORES_NO = {'NO', '0', '-', ''}   # los nulos también cuentan como NO
 
 # =============================================================================
-# Valores para quitar tildes
-TILDES = str.maketrans('ÁÉÍÓÚÜáéíóúü', 'AEIOUUaeiouu')   # no incluye la Ñ
+# Valores para quitar tildes 
+TILDES = str.maketrans('ÁÉÍÓÚÜáéíóúüÀÈÌÒÙàèìòù', 'AEIOUUaeiouuAEIOUaeiou')   # no incluye la Ñ
+
+
 COLUMNAS_SIN_TILDES = [
     'provincia', 'descripcionestablecimiento', 'especialidad',
     'regimen_laboral', 'condicion_laboral',
@@ -35,7 +37,8 @@ CORRECCIONES_QUINTIL = {
 
 # =============================================================================
 # Convertimos datos de algunas columnas a Mayusculas
-COLUMNAS_MAYUSCULA = ['diresa', 'red', 'microrred', 'categoria', 'condicion_especialidad']
+COLUMNAS_MAYUSCULA = ['diresa', 'red', 'microrred', 'categoria', 'condicion_especialidad', 'especialidad']
+
 SIN_RED = {
     'red': 'NO PERTENECE A NINGUNA RED',
     'microrred': 'NO PERTENECE A NINGUNA MICRORED',
@@ -61,6 +64,11 @@ COLUMNAS_BOOLEANAS = ['distfrontera', 'zaf2014final', 'estrategicos']
 VALORES_SIN_DATO = {
     'sexo': 'Sin dato',   # 543 nulos de 2019 (médicos residentes sin sexo ni edad en la fuente)
 }
+
+# =============================================================================
+# Cantidad esperada de filas con id_especialidad pero sin nombre (texto truncado en la fuente)
+# Si se añade nuevo excel y se ve que hay mas de 12 se detentra y enviara alerta
+IDS_SIN_NOMBRE_ESPERADOS = 12
 
 
 # =============================================================================
@@ -514,6 +522,34 @@ def limpiar_especialidad(df):
     df['condicion_especialidad'] = s.mask(s.str.contains('ESPECIF', na=False), 'NO ESPECIFICADO')
     return df
 
+def corregir_ids_sin_nombre(df):
+    """Filas con id_especialidad pero sin nombre de especialidad (texto truncado en la
+    fuente, ej. 'GESTIO'): pasan a es_especialista = NO y se vacían id_especialidad
+    y condicion_especialidad. Se detiene si la cantidad cambia, para revisarlo."""
+    mask = df['id_especialidad'].notna() & df['especialidad'].isna()
+    if mask.sum() != IDS_SIN_NOMBRE_ESPERADOS:
+        raise ValueError(
+            f"id_especialidad sin nombre: {mask.sum()} filas "
+            f"(esperadas {IDS_SIN_NOMBRE_ESPERADOS}); revisar antes de continuar"
+        )
+    df.loc[mask, 'es_especialista'] = 'NO'
+    df.loc[mask, ['id_especialidad', 'condicion_especialidad']] = pd.NA
+    return df
+
+def unificar_especialidades(df):
+    """Cada id_especialidad usa el nombre del año más reciente en que aparece.
+    Corrige renombres entre años y errores de digitación (p. ej. N005, TMLC9).
+    Va después de limpiar_texto, que deja el nombre en mayúscula y sin tildes."""
+    validas = df.dropna(subset=['id_especialidad', 'especialidad'])
+    ultimo = (
+        validas.sort_values('anio_registro', kind='stable')
+        .drop_duplicates('id_especialidad', keep='last')
+        .set_index('id_especialidad')['especialidad']
+    )
+    nuevo = df['id_especialidad'].map(ultimo)
+    df['especialidad'] = nuevo.fillna(df['especialidad']).astype('string')
+    return df
+
 def aplicar_reglas_negocio(df):
     """Marca registros que violan las reglas de negocio de es_especialista.
     No modifica los datos originales: solo agrega columnas flag_*."""
@@ -581,6 +617,8 @@ def consolidar_datos(ruta_datos="data/raw"):
     consolidado = unificar_establecimientos(consolidado)
     consolidado = agregar_categoria_actual(consolidado)  
     consolidado = limpiar_especialidad(consolidado) 
+    consolidado = corregir_ids_sin_nombre(consolidado)
+    consolidado = unificar_especialidades(consolidado) 
     consolidado = aplicar_reglas_negocio(consolidado)  
     consolidado = convertir_a_booleano(consolidado) 
     consolidado = eliminar_columnas_innecesarias(consolidado)  
