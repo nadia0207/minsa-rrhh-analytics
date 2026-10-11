@@ -70,6 +70,16 @@ VALORES_SIN_DATO = {
 # Si se añade nuevo excel y se ve que hay mas de 12 se detentra y enviara alerta
 IDS_SIN_NOMBRE_ESPERADOS = 12
 
+# =============================================================================
+# Residentes y especialidad
+CONDICIONES_RESIDENTE = {'residente'}   # en minúscula
+
+# nombre de especialidad -> id (solo especialidades que existen en una única profesión)
+CODIGOS_ESPECIALIDAD = {
+    'FARMACIA HOSPITALARIA': 'QF08',   # 15 filas de residentes QF de 2021 sin id
+    'FARMACIA CLINICA': 'QF04',        # 9 filas
+}
+SIN_DATO_ESPECIALIDAD = 'SIN_DATO'
 
 # =============================================================================
 # A. CONFIGURACIÓN ESTRUCTURAL
@@ -550,6 +560,52 @@ def unificar_especialidades(df):
     df['especialidad'] = nuevo.fillna(df['especialidad']).astype('string')
     return df
 
+def _es_residente(df):
+    return (df['condicion_laboral'].astype('string').str.strip().str.lower()
+            .isin(CONDICIONES_RESIDENTE))
+
+
+def completar_ids_especialidad(df):
+    """Completa id_especialidad con un diccionario explícito nombre -> id."""
+    sin_id = df['especialidad'].notna() & df['id_especialidad'].isna()
+    ids = df['especialidad'].map(CODIGOS_ESPECIALIDAD)
+    mask = sin_id & ids.notna()
+    df.loc[mask, 'id_especialidad'] = ids[mask]
+    print(f"completar_ids_especialidad: {int(mask.sum())} filas con id completado")
+    return df
+
+
+def corregir_residentes(df):
+    """Un residente está en formación: es_especialista = NO y condicion_especialidad = RESIDENTE
+    (la fuente de residentes venía de otro Excel y no siempre era coherente)."""
+    es_res = _es_residente(df)
+    cambia_es = es_res & (df['es_especialista'] != 'NO')
+    cambia_cond = es_res & (df['condicion_especialidad'] != 'RESIDENTE').fillna(True)
+    df.loc[es_res, 'es_especialista'] = 'NO'
+    df.loc[es_res, 'condicion_especialidad'] = 'RESIDENTE'
+    print(f"corregir_residentes: es_especialista -> NO en {int(cambia_es.sum())}; "
+          f"condicion_especialidad -> RESIDENTE en {int(cambia_cond.sum())}")
+    return df
+
+
+def limpiar_no_especificado(df):
+    """'NO ESPECIFICADO' sin especialidad no aporta información: pasa a nulo."""
+    mask = (df['condicion_especialidad'] == 'NO ESPECIFICADO') & df['especialidad'].isna()
+    df.loc[mask, 'condicion_especialidad'] = pd.NA
+    print(f"limpiar_no_especificado: {int(mask.sum())} filas a nulo")
+    return df
+
+
+def rellenar_sin_dato_residentes(df):
+    """Un residente siempre tiene especialidad en formación; si falta, es un dato
+    que debería existir: se marca SIN_DATO para que se vea en Power BI."""
+    es_res = _es_residente(df)
+    for col in ['especialidad', 'id_especialidad']:
+        mask = es_res & df[col].isna()
+        df.loc[mask, col] = SIN_DATO_ESPECIALIDAD
+        print(f"rellenar_sin_dato_residentes: {col} -> SIN_DATO en {int(mask.sum())}")
+    return df
+
 def aplicar_reglas_negocio(df):
     """Marca registros que violan las reglas de negocio de es_especialista.
     No modifica los datos originales: solo agrega columnas flag_*."""
@@ -610,6 +666,7 @@ def consolidar_datos(ruta_datos="data/raw"):
     consolidado = normalizar_tipos(consolidado)
     consolidado = limpiar_texto(consolidado)
     consolidado = unificar_sin_red(consolidado)
+    consolidado = completar_ids_especialidad(consolidado) 
     consolidado = rellenar_sin_dato(consolidado)
     consolidado = corregir_distritos(consolidado)
     consolidado = corregir_quintil(consolidado)
@@ -620,6 +677,9 @@ def consolidar_datos(ruta_datos="data/raw"):
     consolidado = corregir_ids_sin_nombre(consolidado)
     consolidado = unificar_especialidades(consolidado) 
     consolidado = aplicar_reglas_negocio(consolidado)  
+    consolidado = corregir_residentes(consolidado)             
+    consolidado = limpiar_no_especificado(consolidado)         
+    consolidado = rellenar_sin_dato_residentes(consolidado)    
     consolidado = convertir_a_booleano(consolidado) 
     consolidado = eliminar_columnas_innecesarias(consolidado)  
 
