@@ -84,6 +84,8 @@ SIN_DATO_ESPECIALIDAD = 'SIN_DATO'
 COND_SIN_ESPECIALIDAD_ESPERADAS = 777   # 771 + los 6 'NO ESPECIFICADO' sin especialidad
 ESP_SIN_CONDICION_ESPERADAS = 75        # 68 SI incompletos + 7 NO
 
+CONDICION_RESIDENTE_SIN_SER_RESIDENTE_ESPERADAS = 1   # médico 2020 CAS COVID con condicion_especialidad = RESIDENTE
+NO_ESPECIALISTAS_CON_ESPECIALIDAD_ESPERADOS = 104     # 2020-2021; NO con especialidad y condición
 # =============================================================================
 # A. CONFIGURACIÓN ESTRUCTURAL
 # =============================================================================
@@ -567,7 +569,6 @@ def _es_residente(df):
     return (df['condicion_laboral'].astype('string').str.strip().str.lower()
             .isin(CONDICIONES_RESIDENTE))
 
-
 def completar_ids_especialidad(df):
     """Completa id_especialidad con un diccionario explícito nombre -> id."""
     sin_id = df['especialidad'].notna() & df['id_especialidad'].isna()
@@ -576,7 +577,6 @@ def completar_ids_especialidad(df):
     df.loc[mask, 'id_especialidad'] = ids[mask]
     print(f"completar_ids_especialidad: {int(mask.sum())} filas con id completado")
     return df
-
 
 def corregir_residentes(df):
     """Un residente está en formación: es_especialista = NO y condicion_especialidad = RESIDENTE
@@ -625,6 +625,40 @@ def igualar_condicion_especialidad(df):
 
     print(f"igualar_condicion_especialidad: {n_sin_esp} condiciones a nulo; "
           f"{n_sin_cond} -> NO ESPECIFICADO ({int(cambia_si.sum())} pasan a es_especialista = SI)")
+    return df
+
+def corregir_especialistas_no_marcados(df):
+    """1. condicion_especialidad = RESIDENTE solo corresponde a residentes por condicion_laboral;
+       en quien no lo es, pasa a NO ESPECIFICADO.
+    2. Quien no es residente y tiene especialidad con condición (RNE, TITULO, CONSTANCIA o
+       NO ESPECIFICADO) es especialista: es_especialista pasa de NO a SI.
+    Se detiene si las cantidades cambian, para revisarlo."""
+    es_res = _es_residente(df)
+
+    # Calcular las filas afectadas (todavía sin modificar nada)
+    falso_res = (df['condicion_especialidad'] == 'RESIDENTE') & ~es_res
+    mask = (
+        (df['es_especialista'] == 'NO')
+        & df['especialidad'].notna()
+        & df['condicion_especialidad'].notna()
+        & ~es_res
+    )
+
+    n_falso, n = int(falso_res.sum()), int(mask.sum())
+    if (n_falso != CONDICION_RESIDENTE_SIN_SER_RESIDENTE_ESPERADAS
+            or n != NO_ESPECIALISTAS_CON_ESPECIALIDAD_ESPERADOS):
+        raise ValueError(
+            f"corregir_especialistas_no_marcados: RESIDENTE sin ser residente = {n_falso} "
+            f"(esperadas {CONDICION_RESIDENTE_SIN_SER_RESIDENTE_ESPERADAS}); "
+            f"NO con especialidad = {n} (esperadas {NO_ESPECIALISTAS_CON_ESPECIALIDAD_ESPERADOS}); "
+            "revisar antes de continuar"
+        )
+
+    # Aplicar las correcciones
+    df.loc[falso_res, 'condicion_especialidad'] = 'NO ESPECIFICADO'
+    df.loc[mask, 'es_especialista'] = 'SI'
+    print(f"corregir_especialistas_no_marcados: {n_falso} RESIDENTE -> NO ESPECIFICADO; "
+          f"{n} filas pasan a es_especialista = SI")
     return df
 
 def rellenar_sin_dato_residentes(df):
@@ -710,7 +744,8 @@ def consolidar_datos(ruta_datos="data/raw"):
     consolidado = unificar_especialidades(consolidado) 
     consolidado = aplicar_reglas_negocio(consolidado)  
     consolidado = corregir_residentes(consolidado)  
-    consolidado = igualar_condicion_especialidad(consolidado)                   
+    consolidado = igualar_condicion_especialidad(consolidado)
+    consolidado = corregir_especialistas_no_marcados(consolidado)                    
     consolidado = rellenar_sin_dato_residentes(consolidado)    
     consolidado = convertir_a_booleano(consolidado) 
     consolidado = eliminar_columnas_innecesarias(consolidado)  
