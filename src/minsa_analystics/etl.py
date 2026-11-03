@@ -37,7 +37,7 @@ CORRECCIONES_QUINTIL = {
 
 # =============================================================================
 # Convertimos datos de algunas columnas a Mayusculas
-COLUMNAS_MAYUSCULA = ['diresa', 'red', 'microrred', 'categoria', 'condicion_especialidad', 'especialidad']
+COLUMNAS_MAYUSCULA = ['diresa', 'red', 'microrred', 'categoria', 'condicion_especialidad', 'especialidad','regimen_laboral']
 
 SIN_RED = {
     'red': 'NO PERTENECE A NINGUNA RED',
@@ -94,6 +94,17 @@ GRUPOS_SIN_ESPECIALIDAD = {
     'Auxiliar Asistencial', 'Auxiliar Administrativo',
 }
 TECNICOS_AUX_CON_ESPECIALIDAD_ESPERADOS = 206   # 2019-2021 y 2023
+
+# =======================================================================
+# Regimenes laborales esperados
+REGIMENES_ESPERADOS = {
+    'REGIMEN 276', 'REGIMEN 1057 (CAS)', 'REGIMEN 728',
+    'SERVICIO DE TERCEROS / LOCACION DE SERVICIOS',
+    'INTERNOS DE CARRERAS DE LA SALUD', 'PRACTICANTES',
+    'PERSONAL PPTO CONTRALORIA', 'PERSONAL PPTO SERVIR',
+    'FAC O PAC / PPTO MEF',
+}
+
 # =============================================================================
 # A. CONFIGURACIÓN ESTRUCTURAL
 # =============================================================================
@@ -472,6 +483,15 @@ def unificar_sin_red(df):
         df[col] = s.mask(sin_red, etiqueta)
     return df
 
+def unificar_regimen_laboral(df):
+    """Unifica la grafía de FAC o PAC ('–' → '/') y se detiene si aparece un régimen
+    nuevo, para revisarlo. Va después de limpiar_texto, que deja la columna en mayúscula."""
+    df['regimen_laboral'] = df['regimen_laboral'].str.replace('–', '/', regex=False)
+    nuevos = set(df['regimen_laboral'].dropna().unique()) - REGIMENES_ESPERADOS
+    if nuevos or df['regimen_laboral'].isna().any():
+        raise ValueError(f"regimen_laboral: valores no esperados {nuevos}; revisar antes de continuar")
+    return df
+
 def rellenar_sin_dato(df):
     """Reemplaza los nulos de columnas categóricas por una etiqueta explícita."""
     for col, etiqueta in VALORES_SIN_DATO.items():
@@ -759,6 +779,7 @@ def consolidar_datos(ruta_datos="data/raw"):
     consolidado = normalizar_tipos(consolidado)
     consolidado = limpiar_texto(consolidado)
     consolidado = unificar_sin_red(consolidado)
+    consolidado = unificar_regimen_laboral(consolidado)
     consolidado = completar_ids_especialidad(consolidado) 
     consolidado = rellenar_sin_dato(consolidado)
     consolidado = corregir_distritos(consolidado)
