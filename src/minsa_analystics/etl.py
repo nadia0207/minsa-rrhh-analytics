@@ -86,6 +86,14 @@ ESP_SIN_CONDICION_ESPERADAS = 75        # 68 SI incompletos + 7 NO
 
 CONDICION_RESIDENTE_SIN_SER_RESIDENTE_ESPERADAS = 1   # médico 2020 CAS COVID con condicion_especialidad = RESIDENTE
 NO_ESPECIALISTAS_CON_ESPECIALIDAD_ESPERADOS = 104     # 2020-2021; NO con especialidad y condición
+
+# =======================================================================
+# Quitar especialidad a grupo no profesionales
+GRUPOS_SIN_ESPECIALIDAD = {
+    'Tecnico Asistencial', 'Tecnico Administrativo',
+    'Auxiliar Asistencial', 'Auxiliar Administrativo',
+}
+TECNICOS_AUX_CON_ESPECIALIDAD_ESPERADOS = 206   # 2019-2021 y 2023
 # =============================================================================
 # A. CONFIGURACIÓN ESTRUCTURAL
 # =============================================================================
@@ -661,6 +669,25 @@ def corregir_especialistas_no_marcados(df):
           f"{n} filas pasan a es_especialista = SI")
     return df
 
+def quitar_especialidad_tecnicos_auxiliares(df):
+    """Un técnico o auxiliar no ejerce la especialidad por el cargo que ocupa: pasa a
+    es_especialista = NO y se vacían los campos de especialidad. Se deja flag para
+    conservar trazabilidad. Se detiene si la cantidad cambia, para revisarlo.
+    Debe ir después de corregir_especialistas_no_marcados."""
+    mask = df['grupofinal2'].isin(GRUPOS_SIN_ESPECIALIDAD) & (df['es_especialista'] == 'SI')
+    n = int(mask.sum())
+    if n != TECNICOS_AUX_CON_ESPECIALIDAD_ESPERADOS:
+        raise ValueError(
+            f"quitar_especialidad_tecnicos_auxiliares: {n} filas "
+            f"(esperadas {TECNICOS_AUX_CON_ESPECIALIDAD_ESPERADOS}); revisar antes de continuar"
+        )
+    df['flag_especialidad_removida_por_cargo'] = mask
+    df.loc[mask, 'es_especialista'] = 'NO'
+    df.loc[mask, ['id_especialidad', 'especialidad', 'condicion_especialidad']] = pd.NA
+    df.loc[mask, 'flag_especialista_incompleto'] = False
+    print(f"quitar_especialidad_tecnicos_auxiliares: {n} filas pasan a es_especialista = NO")
+    return df
+
 def rellenar_sin_dato_residentes(df):
     """Un residente siempre tiene especialidad en formación; si falta, es un dato
     que debería existir: se marca SIN_DATO para que se vea en Power BI."""
@@ -745,7 +772,8 @@ def consolidar_datos(ruta_datos="data/raw"):
     consolidado = aplicar_reglas_negocio(consolidado)  
     consolidado = corregir_residentes(consolidado)  
     consolidado = igualar_condicion_especialidad(consolidado)
-    consolidado = corregir_especialistas_no_marcados(consolidado)                    
+    consolidado = corregir_especialistas_no_marcados(consolidado) 
+    consolidado = quitar_especialidad_tecnicos_auxiliares(consolidado)                   
     consolidado = rellenar_sin_dato_residentes(consolidado)    
     consolidado = convertir_a_booleano(consolidado) 
     consolidado = eliminar_columnas_innecesarias(consolidado)  
