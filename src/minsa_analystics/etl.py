@@ -105,6 +105,61 @@ REGIMENES_ESPERADOS = {
     'FAC O PAC / PPTO MEF',
 }
 
+# =======================================================================
+# Condiciones laborales esperados
+MAPEO_CONDICION = {
+    # (regimen_laboral, condicion_laboral): (condicion_laboral_1 [agrupada], condicion_laboral_2 [detalle])
+    ('FAC O PAC / PPTO MEF', 'FAC O PAC / PPTO MEF'): ('FAC O PAC / PPTO MEF', 'FAC O PAC / PPTO MEF'),
+    ('INTERNOS DE CARRERAS DE LA SALUD', 'CON ESTIPENDIO (PAGADO)'): ('INTERNOS DE CARRERAS DE LA SALUD', 'CON ESTIPENDIO (PAGADO)'),
+    ('INTERNOS DE CARRERAS DE LA SALUD', 'SIN ESTIPENDIO (NO PAGADO)'): ('INTERNOS DE CARRERAS DE LA SALUD', 'SIN ESTIPENDIO (NO PAGADO)'),
+    ('PERSONAL PPTO CONTRALORIA', 'PERSONAL PPTO CONTRALORIA'): ('PERSONAL PPTO CONTRALORIA O SERVIR', 'PERSONAL PPTO CONTRALORIA'),
+    ('PERSONAL PPTO SERVIR', 'PERSONAL PPTO SERVIR'): ('PERSONAL PPTO CONTRALORIA O SERVIR', 'PERSONAL PPTO SERVIR'),
+    ('PRACTICANTES', 'PRACTICANTES'): ('PRACTICANTES', 'PRACTICANTES'),
+    # CAS
+    ('REGIMEN 1057 (CAS)', 'CONTRATO CAS'): ('CONTRATO CAS', 'CONTRATO CAS'),
+    ('REGIMEN 1057 (CAS)', 'CAS REGULAR MINSA'): ('CONTRATO CAS', 'CONTRATO CAS'),
+    ('REGIMEN 1057 (CAS)', 'REINCORPORADO'): ('CONTRATO CAS', 'CONTRATO CAS'),
+    ('REGIMEN 1057 (CAS)', 'CONTRATO MUNICIPAL CAS'): ('CONTRATO CAS', 'CONTRATO CAS'),
+    ('REGIMEN 1057 (CAS)', 'CAS LEY 31538'): ('CONTRATO CAS', 'LEY 31538'),
+    ('REGIMEN 1057 (CAS)', 'CAS LEY N° 31538'): ('CONTRATO CAS', 'LEY 31538'),
+    ('REGIMEN 1057 (CAS)', 'CONTRATADO A PLAZO DETERMINADO'): ('CONTRATO CAS', 'CONTRATADO A PLAZO DETERMINADO'),
+    ('REGIMEN 1057 (CAS)', 'CONTRATADO A PLAZO INDETERMINADO'): ('CONTRATO CAS', 'CONTRATADO A PLAZO INDETERMINADO'),
+    ('REGIMEN 1057 (CAS)', 'CAS COVID MINSA'): ('CONTRATO CAS', 'CAS COVID'),
+    ('REGIMEN 1057 (CAS)', 'CAS COVID HOSPITALES MODULARES'): ('CONTRATO CAS', 'CAS COVID'),
+    ('REGIMEN 1057 (CAS)', 'CAS COVID BRIGADAS ENA LLAMOSAS'): ('CONTRATO CAS', 'CAS COVID'),
+    ('REGIMEN 1057 (CAS)', 'CAS COVID BRIGADAS CUBANOS'): ('CONTRATO CAS', 'CAS COVID'),
+    ('REGIMEN 1057 (CAS)', 'NO ESPECIFICA'): ('NO ESPECIFICA', 'NO ESPECIFICA'),
+    # Regimen 276
+    ('REGIMEN 276', 'NOMBRADO'): ('NOMBRADO', 'NOMBRADO'),
+    ('REGIMEN 276', 'CONTRATADO 276 - PLAZO FIJO'): ('CONTRATADO 276 - PLAZO FIJO', 'CONTRATADO 276 - PLAZO FIJO'),
+    ('REGIMEN 276', 'CONTRATADO 276 - PLAZO INDETERMINADO'): ('CONTRATADO 276 - PLAZO INDETERMINADO', 'CONTRATADO 276 - PLAZO INDETERMINADO'),
+    ('REGIMEN 276', 'RESIDENTE'): ('RESIDENTE', 'RESIDENTE'),
+    ('REGIMEN 276', 'RESIDENTE PLAZA CAUTIVA'): ('RESIDENTE', 'RESIDENTE PLAZA CAUTIVA'),
+    ('REGIMEN 276', 'DESTACADO'): ('DESTACADO', 'DESTACADO'),
+    ('REGIMEN 276', 'SERUMS REMUNERADO'): ('SERUMS', 'SERUMS REMUNERADO'),
+    ('REGIMEN 276', 'SERUMS EQUIVALENTE'): ('SERUMS', 'SERUMS EQUIVALENTE'),
+    ('REGIMEN 276', 'NO ESPECIFICA'): ('NO ESPECIFICA', 'NO ESPECIFICA'),
+    ('REGIMEN 276', 'DESIGNADO DE CARRERA'): ('DESIGNADO', 'DESIGNADO DE CARRERA'),
+    ('REGIMEN 276', 'DESIGNADO NO DE CARRERA'): ('DESIGNADO', 'DESIGNADO NO DE CARRERA'),
+    ('REGIMEN 276', 'DESIGNADO'): ('DESIGNADO', 'DESIGNADO'),
+    ('REGIMEN 276', 'REINCORPORADO'): ('REINCORPORADO', 'REINCORPORADO'),
+    ('REGIMEN 276', 'ENCARGADO'): ('ENCARGADO', 'ENCARGADO'),
+    # Regimen 728
+    ('REGIMEN 728', 'CONTRATO CLAS'): ('CONTRATO CLAS', 'CONTRATO CLAS'),
+    ('REGIMEN 728', 'CONTRATO 728 - PLAZO INDETERMINADO'): ('CONTRATO 728 - PLAZO INDETERMINADO', 'CONTRATO 728 - PLAZO INDETERMINADO'),
+    ('REGIMEN 728', 'DESIGNADO NO DE CARRERA'): ('DESIGNADO', 'DESIGNADO NO DE CARRERA'),
+    ('REGIMEN 728', 'DESIGNADO'): ('DESIGNADO', 'DESIGNADO'),
+    ('REGIMEN 728', 'NO ESPECIFICA'): ('NO ESPECIFICA', 'NO ESPECIFICA'),
+    ('REGIMEN 728', 'REINCORPORADO'): ('REINCORPORADO', 'REINCORPORADO'),
+    # Terceros
+    ('SERVICIO DE TERCEROS / LOCACION DE SERVICIOS', 'SERVICIO DE TERCEROS / LOCACION DE SERVICIOS'):
+        ('SERVICIO DE TERCEROS / LOCACION DE SERVICIOS', 'SERVICIO DE TERCEROS / LOCACION DE SERVICIOS'),
+    ('SERVICIO DE TERCEROS / LOCACION DE SERVICIOS', 'CONTRATO MUNICIPAL POR SERVICIO DE TERCEROS / POR LOCACION DE SERVICIOS'):
+        ('SERVICIO DE TERCEROS / LOCACION DE SERVICIOS', 'CONTRATO MUNICIPAL POR SERVICIO DE TERCEROS / POR LOCACION DE SERVICIOS'),
+    ('SERVICIO DE TERCEROS / LOCACION DE SERVICIOS', 'FONDO MINERO'):
+        ('SERVICIO DE TERCEROS / LOCACION DE SERVICIOS', 'FONDO MINERO'),
+}
+
 # =============================================================================
 # A. CONFIGURACIÓN ESTRUCTURAL
 # =============================================================================
@@ -492,6 +547,26 @@ def unificar_regimen_laboral(df):
         raise ValueError(f"regimen_laboral: valores no esperados {nuevos}; revisar antes de continuar")
     return df
 
+def agregar_condiciones_laborales(df):
+    """Agrega condicion_laboral_1 (agrupada) y condicion_laboral_2 (detalle) según
+    MAPEO_CONDICION. Los SERUMS se clasifican por tipo: EQUIVALENTE si lo dice el texto,
+    REMUNERADO en los demás casos. Se detiene si aparece una combinación sin mapeo.
+    No modifica condicion_laboral: las funciones de residentes la siguen usando."""
+    reg = df['regimen_laboral'].str.upper().str.replace('–', '/', regex=False)
+    cond = df['condicion_laboral'].str.upper().str.replace('–', '/', regex=False)
+    es_serums = cond.str.startswith('SERUMS', na=False)
+    tipo = cond.str.contains('EQUIVALENTE', na=False).map({True: 'EQUIVALENTE', False: 'REMUNERADO'})
+    cond = cond.mask(es_serums, 'SERUMS ' + tipo)
+
+    clave = reg + '|' + cond
+    df['condicion_laboral_1'] = clave.map({f'{r}|{c}': v[0] for (r, c), v in MAPEO_CONDICION.items()})
+    df['condicion_laboral_2'] = clave.map({f'{r}|{c}': v[1] for (r, c), v in MAPEO_CONDICION.items()})
+
+    sin_mapeo = clave[df['condicion_laboral_1'].isna()].unique()
+    if len(sin_mapeo):
+        raise ValueError(f"condicion_laboral: combinaciones sin mapeo {list(sin_mapeo)}; revisar antes de continuar")
+    return df
+
 def rellenar_sin_dato(df):
     """Reemplaza los nulos de columnas categóricas por una etiqueta explícita."""
     for col, etiqueta in VALORES_SIN_DATO.items():
@@ -780,6 +855,7 @@ def consolidar_datos(ruta_datos="data/raw"):
     consolidado = limpiar_texto(consolidado)
     consolidado = unificar_sin_red(consolidado)
     consolidado = unificar_regimen_laboral(consolidado)
+    consolidado = agregar_condiciones_laborales(consolidado)
     consolidado = completar_ids_especialidad(consolidado) 
     consolidado = rellenar_sin_dato(consolidado)
     consolidado = corregir_distritos(consolidado)
