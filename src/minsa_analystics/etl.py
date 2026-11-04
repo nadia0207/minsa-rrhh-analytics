@@ -20,7 +20,7 @@ TILDES = str.maketrans('ÁÉÍÓÚÜáéíóúüÀÈÌÒÙàèìòù', 'AEIOUUae
 
 COLUMNAS_SIN_TILDES = [
     'provincia', 'descripcionestablecimiento', 'especialidad',
-    'regimen_laboral', 'condicion_laboral',
+    'regimen_laboral', 'condicion_laboral', 'grupofinal2', 'grupofinal3'
 ]
 
 # =============================================================================
@@ -188,6 +188,36 @@ CORRECCIONES_CARGO = {
     'ASISTENTE EN RECURSOS NATURALES I (ASISTENTE/A PROFESIONAL I)'  : 'ASISTENTE EN RECURSOS NATURALES I',
 }
 FILAS_CARGO_CORREGIDAS_ESPERADAS = 12509
+
+# =======================================================================
+# Corrigiendo Grupofinal2 y Grupofinal3
+
+GRUPOFINAL3_POR_GRUPOFINAL2 = {
+    'Auxiliar Administrativo'   : {'Auxiliar Administrativo'},
+    'Auxiliar Asistencial'      : {'Auxiliar Asistencial'},
+    'Profesional Administrativo': {'Profesional Administrativo'},
+    'Tecnico Administrativo'    : {'Tecnico Administrativo'},
+    'Tecnico Asistencial'       : {'Tecnico Asistencial'},
+    'Profesional Asistencial'   : {
+        'Biologo', 'Enfermero', 'Ingeniero Sanitario', 'Medico', 'Medico Veterinario',
+        'Nutricionista', 'Obstetra', 'Odontologo', 'Profesional Asistencial No Especificado',
+        'Psicologo', 'Quimico', 'Quimico Farmaceutico', 'Tecnicos Especializados',
+        'Tecnologo Medico', 'Trabajadora Social',
+    },
+}
+
+# =======================================================================
+# Creando SubGrupo(Asistencial, Administrativo)
+
+SUBGRUPO_POR_GRUPO = {
+    'Medico'                    : 'Asistencial', 
+    'Profesional Asistencial'   : 'Asistencial',
+    'Tecnico Asistencial'       : 'Asistencial',
+    'Auxiliar Asistencial'      : 'Asistencial',
+    'Profesional Administrativo': 'Administrativo', 
+    'Tecnico Administrativo'    : 'Administrativo',
+    'Auxiliar Administrativo'   : 'Administrativo',
+}
 
 # =============================================================================
 # A. CONFIGURACIÓN ESTRUCTURAL
@@ -592,6 +622,38 @@ def corregir_cargo(df):
     df.loc[m, 'cargo'] = 'QUIMICO FARMACEUTICO'
     return df
 
+def unificar_grupos(df):
+    """Unifica la escritura de grupofinal3 (las tildes las quita limpiar_texto) y valida la
+    jerarquía grupofinal2 -> grupofinal3. Se detiene si aparece un grupo o un cruce nuevo."""
+    df['grupofinal3'] = df['grupofinal3'].replace({
+        'Ingeniero sanitario': 'Ingeniero Sanitario',
+        'Profesional Asistencial no especificado': 'Profesional Asistencial No Especificado',
+    })
+    pares = set(map(tuple, df[['grupofinal2', 'grupofinal3']].drop_duplicates().to_numpy()))
+    esperados = {(g2, g3) for g2, g3s in GRUPOFINAL3_POR_GRUPOFINAL2.items() for g3 in g3s}
+    if df[['grupofinal2', 'grupofinal3']].isna().any().any() or pares - esperados:
+        raise ValueError(f"unificar_grupos: cruces no esperados {pares - esperados}; "
+                         "revisar antes de continuar")
+    return df
+
+def agregar_grupofinal4_y_subgrupo(df):
+    """grupofinal4 = grupofinal2 con los médicos separados (según grupofinal3);
+    sub_grupo = Asistencial / Administrativo. Se detiene si hay un grupo sin subgrupo
+    o un médico fuera de Profesional Asistencial."""
+    es_medico = df['grupofinal3'] == 'Medico'          # igualdad exacta, no contains
+   
+    if not es_medico.any():
+        raise ValueError("grupofinal4: no se encontró ningún 'Médico' en grupofinal3")
+    if (es_medico & (df['grupofinal2'] != 'Profesional Asistencial')).any():
+        raise ValueError("grupofinal4: hay médicos fuera de Profesional Asistencial")
+
+    df['grupofinal4'] = df['grupofinal2'].mask(es_medico, 'Medico')
+    df['sub_grupo'] = df['grupofinal4'].map(SUBGRUPO_POR_GRUPO)
+    if df['sub_grupo'].isna().any():
+        sin = df.loc[df['sub_grupo'].isna(), 'grupofinal4'].unique()
+        raise ValueError(f"sub_grupo: grupos sin mapeo {list(sin)}")
+    return df
+
 def agregar_condiciones_laborales(df):
     """Agrega condicion_laboral_1 (agrupada) y condicion_laboral_2 (detalle) según
     MAPEO_CONDICION. Los SERUMS se clasifican por tipo: EQUIVALENTE si lo dice el texto,
@@ -901,6 +963,8 @@ def consolidar_datos(ruta_datos="data/raw"):
     consolidado = unificar_sin_red(consolidado)
     consolidado = unificar_regimen_laboral(consolidado)
     consolidado = corregir_cargo(consolidado)
+    consolidado = unificar_grupos(consolidado)
+    consolidado = agregar_grupofinal4_y_subgrupo(consolidado)
     consolidado = agregar_condiciones_laborales(consolidado)
     consolidado = completar_ids_especialidad(consolidado) 
     consolidado = rellenar_sin_dato(consolidado)
