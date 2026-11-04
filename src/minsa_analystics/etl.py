@@ -55,6 +55,7 @@ VALORES_A_NULO = {   # columna: valores que equivalen a "sin especialidad"
 COLUMNAS_A_ELIMINAR = {
     'pea': 'Constante = 1 (contador de tablas dinámicas)',
     'clasificacion': 'Sin actualizar y no usada en reportes; mezcla tipo de establecimiento con unidades administrativas',
+    'id_cargo': 'El campo no tiene corregido los codigos y hay inconsistencia con el cargo'
 }
 
 # =============================================================================
@@ -159,6 +160,34 @@ MAPEO_CONDICION = {
     ('SERVICIO DE TERCEROS / LOCACION DE SERVICIOS', 'FONDO MINERO'):
         ('SERVICIO DE TERCEROS / LOCACION DE SERVICIOS', 'FONDO MINERO'),
 }
+
+# =======================================================================
+# Corrigiendo descripcion de cargos
+
+CORRECCIONES_CARGO = {
+    # Erratas y nombre incompleto
+    'PROFESONAL ADMINISTRATIVO NO ESPECIFICADO': 'PROFESIONAL ADMINISTRATIVO NO ESPECIFICADO',
+    'AUXIILIAR ASISTENCIAL NO ESPECIFICADO'    : 'AUXILIAR ASISTENCIAL NO ESPECIFICADO',
+    'AUXIILIAR ADMINISTRATIVO NO ESPECIFICADO' : 'AUXILIAR ADMINISTRATIVO NO ESPECIFICADO',
+    'PROFESIONAL ASISTENCIAL NO ESPECIFICA'    : 'PROFESIONAL DE LA SALUD NO ESPECIFICADO',
+    # CNN9: tres nombres para el mismo cargo
+    'TECNICO ASISTENCIAL NO ESPECIFICADO'      : 'TECNICO/A ASISTENCIAL',
+    'TECNICO ASISTENCIAL'                      : 'TECNICO/A ASISTENCIAL',
+    # CA114.x: nombre vigente desde 2023 (sin paréntesis)
+    'TECNICO/A SANITARIO/A V (TECNICO/A DE SERVICIOS GENERALES)' : 'TECNICO/A SANITARIO/A V',
+    'TECNICO/A SANITARIO/A IV TECNICO/A DE SERVICIOS GENERALES)' : 'TECNICO/A SANITARIO/A IV',
+    'TECNICO/A SANITARIO/A III (TECNICO/A DE SERVICIOS GENERALES': 'TECNICO/A SANITARIO/A III',
+    'TECNICO/A SANITARIO/A II (TECNICO/A DE SERVICIOS GENERALES)': 'TECNICO/A SANITARIO/A II',
+    'TECNICO/A SANITARIO/A I (TECNICO/A DE SERVICIOS GENERALES)' : 'TECNICO/A SANITARIO/A I',
+    # CA150.x y CA151.x
+    'ASISTENTE EN SERVICIO DE SALUD II (ASISTENTE/A PROFESIONAL II)' : 'ASISTENTE EN SERVICIO DE SALUD II',
+    'ASISTENTE EN SERVICIOS SOCIALES II (ASISTENTE/A PROFESIONAL II)': 'ASISTENTE EN SERVICIOS SOCIALES II',
+    'ASISTENTE EN RECURSOS NATURALES II (ASISTENTE/A PROFESIONAL II)': 'ASISTENTE EN RECURSOS NATURALES II',
+    'ASISTENTE EN SERVICIO DE SALUD I (ASISTENTE/A PROFESIONAL I)'   : 'ASISTENTE EN SERVICIO DE SALUD I',
+    'ASISTENTE EN SERVICIOS SOCIALES I (ASISTENTE/A PROFESIONAL I)'  : 'ASISTENTE EN SERVICIOS SOCIALES I',
+    'ASISTENTE EN RECURSOS NATURALES I (ASISTENTE/A PROFESIONAL I)'  : 'ASISTENTE EN RECURSOS NATURALES I',
+}
+FILAS_CARGO_CORREGIDAS_ESPERADAS = 12509
 
 # =============================================================================
 # A. CONFIGURACIÓN ESTRUCTURAL
@@ -547,6 +576,22 @@ def unificar_regimen_laboral(df):
         raise ValueError(f"regimen_laboral: valores no esperados {nuevos}; revisar antes de continuar")
     return df
 
+def corregir_cargo(df):
+    """Unifica erratas y nombres renombrados de cargo (queda el nombre vigente). Además corrige
+    la única fila con id CA173 cuyo cargo decía ESPECIALISTA ADMINISTRATIVO II, ya que su grupo
+    (Químico Farmacéutico) confirma el id. Debe ir antes de eliminar id_cargo."""
+    n = int(df['cargo'].isin(CORRECCIONES_CARGO).sum())
+    if n != FILAS_CARGO_CORREGIDAS_ESPERADAS:
+        raise ValueError(f"corregir_cargo: {n} filas (esperadas {FILAS_CARGO_CORREGIDAS_ESPERADAS}); "
+                         "revisar antes de continuar")
+    df['cargo'] = df['cargo'].replace(CORRECCIONES_CARGO)
+
+    m = (df['id_cargo'].str.upper() == 'CA173') & (df['cargo'] == 'ESPECIALISTA ADMINISTRATIVO II')
+    if int(m.sum()) != 1:
+        raise ValueError(f"corregir_cargo: {int(m.sum())} filas CA173 (esperada 1)")
+    df.loc[m, 'cargo'] = 'QUIMICO FARMACEUTICO'
+    return df
+
 def agregar_condiciones_laborales(df):
     """Agrega condicion_laboral_1 (agrupada) y condicion_laboral_2 (detalle) según
     MAPEO_CONDICION. Los SERUMS se clasifican por tipo: EQUIVALENTE si lo dice el texto,
@@ -855,6 +900,7 @@ def consolidar_datos(ruta_datos="data/raw"):
     consolidado = limpiar_texto(consolidado)
     consolidado = unificar_sin_red(consolidado)
     consolidado = unificar_regimen_laboral(consolidado)
+    consolidado = corregir_cargo(consolidado)
     consolidado = agregar_condiciones_laborales(consolidado)
     consolidado = completar_ids_especialidad(consolidado) 
     consolidado = rellenar_sin_dato(consolidado)
