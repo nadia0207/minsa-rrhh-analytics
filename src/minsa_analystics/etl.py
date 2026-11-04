@@ -219,6 +219,11 @@ SUBGRUPO_POR_GRUPO = {
     'Auxiliar Administrativo'   : 'Administrativo',
 }
 
+# =======================================================================
+# Condiciones laboral 1 que no deben tener especialidad
+CONDICIONES_EN_FORMACION = {'SERUMS', 'INTERNOS DE CARRERAS DE LA SALUD'}
+ESPECIALISTAS_EN_FORMACION_ESPERADOS = 4
+
 # =============================================================================
 # A. CONFIGURACIÓN ESTRUCTURAL
 # =============================================================================
@@ -890,6 +895,24 @@ def quitar_especialidad_tecnicos_auxiliares(df):
     print(f"quitar_especialidad_tecnicos_auxiliares: {n} filas pasan a es_especialista = NO")
     return df
 
+def quitar_especialidad_en_formacion(df):
+    """SERUMS e internos están en formación, así que no pueden ser especialistas: pasan a
+    es_especialista = NO y se vacían los campos de especialidad. Conserva trazabilidad con un flag
+    y se detiene si la cantidad cambia. Debe ir después de corregir_especialistas_no_marcados."""
+    mask = df['condicion_laboral_1'].isin(CONDICIONES_EN_FORMACION) & (df['es_especialista'] == 'SI')
+    n = int(mask.sum())
+    if n != ESPECIALISTAS_EN_FORMACION_ESPERADOS:
+        raise ValueError(
+            f"quitar_especialidad_en_formacion: {n} filas "
+            f"(esperadas {ESPECIALISTAS_EN_FORMACION_ESPERADOS}); revisar antes de continuar"
+        )
+    df['flag_especialidad_removida_por_formacion'] = mask
+    df.loc[mask, 'es_especialista'] = 'NO'
+    df.loc[mask, ['id_especialidad', 'especialidad', 'condicion_especialidad']] = pd.NA
+    df.loc[mask, 'flag_especialista_incompleto'] = False
+    print(f"quitar_especialidad_en_formacion: {n} filas pasan a es_especialista = NO")
+    return df
+
 def rellenar_sin_dato_residentes(df):
     """Un residente siempre tiene especialidad en formación; si falta, es un dato
     que debería existir: se marca SIN_DATO para que se vea en Power BI."""
@@ -980,7 +1003,8 @@ def consolidar_datos(ruta_datos="data/raw"):
     consolidado = corregir_residentes(consolidado)  
     consolidado = igualar_condicion_especialidad(consolidado)
     consolidado = corregir_especialistas_no_marcados(consolidado) 
-    consolidado = quitar_especialidad_tecnicos_auxiliares(consolidado)                   
+    consolidado = quitar_especialidad_tecnicos_auxiliares(consolidado) 
+    consolidado = quitar_especialidad_en_formacion(consolidado)              
     consolidado = rellenar_sin_dato_residentes(consolidado)    
     consolidado = convertir_a_booleano(consolidado) 
     consolidado = eliminar_columnas_innecesarias(consolidado)  
