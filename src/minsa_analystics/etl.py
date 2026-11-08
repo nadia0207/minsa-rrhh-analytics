@@ -224,8 +224,26 @@ SUBGRUPO_POR_GRUPO = {
 CONDICIONES_EN_FORMACION = {'SERUMS', 'INTERNOS DE CARRERAS DE LA SALUD'}
 ESPECIALISTAS_EN_FORMACION_ESPERADOS = 4
 
+
+# =======================================================================
+# Agrupar pliegos
+PLIEGO_POR_CODIGO = {'011': 'MINSA', '131': 'INS', '134': 'SUSALUD', '135': 'SIS', '136': 'INEN'}
+
+# =======================================================================
+# Nivel_categoria 
+NIVEL_POR_CATEGORIA = {
+    **dict.fromkeys(['I-1', 'I-2', 'I-3', 'I-4'], '1er. Nivel'),
+    **dict.fromkeys(['II-1', 'II-2', 'II-E'], '2do. Nivel'),
+    **dict.fromkeys(['III-1', 'III-2', 'III-E'], '3er. Nivel'),
+    **dict.fromkeys(['DARES', 'DIRESA', 'DIRIS', 'DISA', 'FISSAL', 'GERESA', 'INS',
+                     'MINSA', 'PRONIS', 'RED', 'SIS', 'SUSALUD', 'UE'], 'Sede Administrativa'),
+    'SIN CATEGORÍA': 'Sin Categoria', 'SIN CATEGORIA': 'Sin Categoria',
+}
+
+# =============================================================================
 # =============================================================================
 # A. CONFIGURACIÓN ESTRUCTURAL
+# =============================================================================
 # =============================================================================
 
 # A.1. Rutas y fila de header por año (relativas a data/raw/)
@@ -504,7 +522,6 @@ def descartar_por_prefijo(anio, prefijo, motivo, columnas_del_anio, columnas_des
         columnas_descartadas[anio][col] = motivo
     return encontradas
 
-
 def inicializar_columnas_descartadas(ruta_datos, mapeo_columnas=None, columnas_descartadas=None):
     """
     Devuelve una copia de COLUMNAS_DESCARTADAS ya completada con las columnas
@@ -523,7 +540,6 @@ def inicializar_columnas_descartadas(ruta_datos, mapeo_columnas=None, columnas_d
             columnas_anio, columnas_descartadas,
         )
     return columnas_descartadas
-
 
 def obtener_columnas_finales(columnas_del_anio, anio, mapeo_columnas, columnas_descartadas):
     """Devuelve los nombres definitivos tras aplicar descartes y renombres (para validación)."""
@@ -655,6 +671,35 @@ def agregar_grupofinal4_y_subgrupo(df):
     if df['sub_grupo'].isna().any():
         sin = df.loc[df['sub_grupo'].isna(), 'grupofinal4'].unique()
         raise ValueError(f"sub_grupo: grupos sin mapeo {list(sin)}")
+    return df
+
+def agregar_tipo_pliego(df):
+    """Agrupa pliegodescrip en tipo_pliego: los de Gobierno Regional se reconocen por el texto
+    y el resto por el código inicial. Se detiene si algún pliego queda sin grupo."""
+    p = df['pliegodescrip']
+    codigo = p.str.extract(r'^(\d{3})')[0]
+    tipo = codigo.map(PLIEGO_POR_CODIGO).mask(p.str.contains('GOBIERNO REGIONAL', na=False),
+                                              'GOBIERNOS REGIONALES')
+    if tipo.isna().any():
+        raise ValueError(f"tipo_pliego: pliegos sin grupo {list(p[tipo.isna()].unique())}")
+    df['tipo_pliego'] = tipo
+    return df
+
+def agregar_rango_edad(df):
+    """Rango etario de la edad al 31/12 del año de registro. Los nulos quedan como SIN DATO."""
+    rangos = pd.cut(df['edad'].astype('float'),
+                    bins=[0, 17, 35, 45, 55, 60, 65, 70, 200],
+                    labels=['<18', '18-35', '36-45', '46-55', '56-60', '61-65', '66-70', '71+'])
+    df['rango_edad'] = rangos.astype('object').fillna('SIN DATO')
+    return df
+
+def agregar_nivel_categoria(df, columna='categoria_actual'):
+    """Nivel de atención según la categoría del establecimiento. Se detiene si hay una
+    categoría sin nivel."""
+    df['nivel_categoria'] = df[columna].map(NIVEL_POR_CATEGORIA)
+    if df['nivel_categoria'].isna().any():
+        sin = df.loc[df['nivel_categoria'].isna(), columna].unique()
+        raise ValueError(f"nivel_categoria: categorías sin nivel {list(sin)}")
     return df
 
 def agregar_condiciones_laborales(df):
@@ -986,6 +1031,9 @@ def consolidar_datos(ruta_datos="data/raw"):
     consolidado = corregir_cargo(consolidado)
     consolidado = unificar_grupos(consolidado)
     consolidado = agregar_grupofinal4_y_subgrupo(consolidado)
+    consolidado = agregar_tipo_pliego(consolidado)
+    consolidado = agregar_rango_edad(consolidado)
+    consolidado = agregar_nivel_categoria(consolidado)
     consolidado = agregar_condiciones_laborales(consolidado)
     consolidado = completar_ids_especialidad(consolidado) 
     consolidado = rellenar_sin_dato(consolidado)
