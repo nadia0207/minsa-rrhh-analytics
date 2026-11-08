@@ -485,12 +485,10 @@ def convertir_fecha_nacimiento(df, columna_original='fecha_nacimiento',
 
     return df
 
-
 def calcular_edad(fecha_nacimiento, anio_corte):
-    """Calcula la edad entera en años al 31 de diciembre del año de corte."""
-    fecha_corte = pd.Timestamp(year=anio_corte, month=12, day=31)
-    return (fecha_corte - fecha_nacimiento).dt.days // 365
-
+    """Edad cumplida al 31 de diciembre del año de corte. A esa fecha todos ya cumplieron años,
+    así que equivale a anio_corte - año de nacimiento."""
+    return anio_corte - fecha_nacimiento.dt.year
 
 def descartar_por_prefijo(anio, prefijo, motivo, columnas_del_anio, columnas_descartadas):
     """
