@@ -693,15 +693,6 @@ def agregar_rango_edad(df):
     df['rango_edad'] = rangos.astype('object').fillna('SIN DATO')
     return df
 
-def agregar_nivel_categoria(df, columna='categoria_actual'):
-    """Nivel de atención según la categoría del establecimiento. Se detiene si hay una
-    categoría sin nivel."""
-    df['nivel_categoria'] = df[columna].map(NIVEL_POR_CATEGORIA)
-    if df['nivel_categoria'].isna().any():
-        sin = df.loc[df['nivel_categoria'].isna(), columna].unique()
-        raise ValueError(f"nivel_categoria: categorías sin nivel {list(sin)}")
-    return df
-
 def agregar_condiciones_laborales(df):
     """Agrega condicion_laboral_1 (agrupada) y condicion_laboral_2 (detalle) según
     MAPEO_CONDICION. Los SERUMS se clasifican por tipo: EQUIVALENTE si lo dice el texto,
@@ -782,6 +773,15 @@ def agregar_categoria_actual(df):
     df['flag_cambio_categoria'] = (
         df.groupby('renaes')['categoria'].transform('nunique') > 1
     )
+    return df
+
+def agregar_nivel_categoria(df, columna='categoria_actual'):
+    """Nivel de atención según la categoría del establecimiento. Se detiene si hay una
+    categoría sin nivel."""
+    df['nivel_categoria'] = df[columna].map(NIVEL_POR_CATEGORIA)
+    if df['nivel_categoria'].isna().any():
+        sin = df.loc[df['nivel_categoria'].isna(), columna].unique()
+        raise ValueError(f"nivel_categoria: categorías sin nivel {list(sin)}")
     return df
 
 def limpiar_especialidad(df):
@@ -1033,7 +1033,6 @@ def consolidar_datos(ruta_datos="data/raw"):
     consolidado = agregar_grupofinal4_y_subgrupo(consolidado)
     consolidado = agregar_tipo_pliego(consolidado)
     consolidado = agregar_rango_edad(consolidado)
-    consolidado = agregar_nivel_categoria(consolidado)
     consolidado = agregar_condiciones_laborales(consolidado)
     consolidado = completar_ids_especialidad(consolidado) 
     consolidado = rellenar_sin_dato(consolidado)
@@ -1042,6 +1041,7 @@ def consolidar_datos(ruta_datos="data/raw"):
     consolidado = unificar_unidades_ejecutoras(consolidado)
     consolidado = unificar_establecimientos(consolidado)
     consolidado = agregar_categoria_actual(consolidado)  
+    consolidado = agregar_nivel_categoria(consolidado)
     consolidado = limpiar_especialidad(consolidado) 
     consolidado = corregir_ids_sin_nombre(consolidado)
     consolidado = unificar_especialidades(consolidado) 
